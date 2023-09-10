@@ -111,6 +111,49 @@ app.get('/login', function(req, res) {
     res.render('login.ejs');
 })
 
-app.post('/login', function(req, res) {
-    console.log(req.body.id, req.body.pw);
+app.post('/login', passport.authenticate('local', {
+    failureRedirect: '/fail'
+}), function(req, res) {
+    res.redirect('/');
 })
+
+passport.use(new LocalStrategy({
+    usernameField: 'id',
+    passwordField: 'pw',
+    session: true,
+    passReqToCallback: false,
+  }, function (submitId, submitPw, done) {
+    console.log(submitId, submitPw);
+    db.collection('login').findOne({ id: submitId }, function (error, result) {
+      if (error) return done(error);
+      if (!result) return done(null, false, { message: '존재하지 않는 아이디입니다.' });
+      if (submitPw == result.pw) {
+        return done(null, result);
+      } else {
+        return done(null, false, { message: '비밀번호가 맞지 않습니다.' });
+      }
+    })
+  }));
+
+passport.serializeUser(function(user, done) {
+    done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+    db.collection('login').findOne({id: id}, function(error, result){
+        done(null, result);
+    })
+});
+
+app.get('/mypage', isLogin, function(req, res) {
+    res.render('myPage.ejs', {user: req.user});
+});
+
+function isLogin(req, res, next) {
+    if (req.user) {
+        next()
+    } else {
+        res.send('login required');
+    }
+};
+
