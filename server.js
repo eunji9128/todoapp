@@ -22,82 +22,9 @@ MongoClient.connect('mongodb+srv://admin:admin123@cluster0.zisf71t.mongodb.net/?
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
-
-app.get('/pet', function (req, res) {
-    res.send('펫 용품 쇼핑 페이지');
-});
-
-app.get('/beauty', function (req, res) {
-    res.send('뷰티 용품 쇼핑 페이지');
-});
-
 app.get('/', function (req, res) {
     res.sendFile(__dirname + '/index.html');
 });
-
-app.get('/write', function (req, res) {
-    res.sendFile(__dirname + '/write.html');
-});
-
-app.get('/list', function(req, res) {
-    db.collection('post').find().toArray(function(error, result) {
-        console.log(result);
-        res.render('list.ejs', { posts : result });
-    })
-})
-
-app.post('/add', function (req, res) {
-    db.collection('counter').findOne({name: 'Total Post Amount'}, function(error, result) {
-        let totalPost = result.totalPost;
-        console.log(totalPost);
-        
-        db.collection('post').insertOne({_id: totalPost, title: req.body.title, date: req.body.date}, function(error, result) {
-            console.log('add 저장완료');
-            db.collection('counter').updateOne({name: 'Total Post Amount'}, {$inc : {totalPost: 1}}, function() {});
-        })
-    })
-    res.send('전송 완료');
-    console.log(req.body.title, req.body.date);
-})
-
-app.delete('/delete', function(req, res) {
-    req.body._id = +req.body._id;
-    console.log(req.body);
-
-    db.collection('post').deleteOne(req.body, function(error, result) {
-        console.log('삭제 완료');
-        res.status(200).send({ message: '삭제 성공' });
-    })
-})
-
-app.get('/detail/:id', function(req, res) {
-    db.collection('post').findOne({_id: +req.params.id} , function(error, result) {
-        console.log('error: ', error,', result: ', result);
-        res.render('detail.ejs', {post: result});
-    })
-
-})
-
-app.get('/edit/:id', function(req, res) {
-    db.collection('post').findOne({_id: +req.params.id}, function(error, result) {
-        res.render('edit.ejs', {post: result});
-    })
-})
-
-app.put('/edit', function(req, res) {
-    console.log(req.body);
-    db.collection('post').updateOne(
-        {_id: +req.body.id},
-        { $set: { 
-            title: req.body.title,
-            date: req.body.date,
-        }},
-        function() {
-            res.redirect('/list');
-        }
-    )
-})
-
 
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
@@ -145,6 +72,79 @@ passport.deserializeUser(function(id, done) {
     })
 });
 
+app.post('/register', function(req, res) {
+    db.collection('login').insertOne( {id: req.body.id, pw: req.body.pw}, function(error, result) {
+        res.redirect('/');
+    } )
+})
+
+app.get('/write', function (req, res) {
+    res.render('write.ejs');
+});
+
+app.get('/list', function(req, res) {
+    db.collection('post').find().toArray(function(error, result) {
+        console.log(result);
+        res.render('list.ejs', { posts : result });
+    })
+})
+
+app.post('/add', function (req, res) {
+    db.collection('counter').findOne({name: 'Total Post Amount'}, function(error, result) {
+        let totalPost = result.totalPost;
+        console.log(totalPost);
+
+        let insertData = {_id: totalPost, user: req.user.id, title: req.body.title, date: req.body.date};
+        
+        db.collection('post').insertOne(insertData, function(error, result) {
+            console.log('add 저장완료');
+            db.collection('counter').updateOne({name: 'Total Post Amount'}, {$inc : {totalPost: 1}}, function() {});
+        })
+    })
+    res.send('전송 완료');
+    console.log(req.body.title, req.body.date);
+})
+
+app.delete('/delete', function(req, res) {
+    req.body._id = +req.body._id;
+    console.log(req.body);
+
+    let deleteData = { _id: req.body._id, user: req.user.id };
+
+    db.collection('post').deleteOne(deleteData, function(error, result) {
+        console.log('삭제 완료');
+        res.status(200).send({ message: '삭제 성공' });
+    })
+})
+
+app.get('/detail/:id', function(req, res) {
+    db.collection('post').findOne({_id: +req.params.id} , function(error, result) {
+        console.log('error: ', error,', result: ', result);
+        res.render('detail.ejs', {post: result});
+    })
+
+})
+
+app.get('/edit/:id', function(req, res) {
+    db.collection('post').findOne({_id: +req.params.id}, function(error, result) {
+        res.render('edit.ejs', {post: result});
+    })
+})
+
+app.put('/edit', function(req, res) {
+    console.log(req.body);
+    db.collection('post').updateOne(
+        {_id: +req.body.id},
+        { $set: { 
+            title: req.body.title,
+            date: req.body.date,
+        }},
+        function() {
+            res.redirect('/list');
+        }
+    )
+})
+
 app.get('/mypage', isLogin, function(req, res) {
     res.render('myPage.ejs', {user: req.user});
 });
@@ -157,3 +157,59 @@ function isLogin(req, res, next) {
     }
 };
 
+app.get('/search', function(req, res) {
+    let searchCond = [
+        {
+            $search: {
+                index: 'titleSearch',
+                text: {
+                    query: req.query.value,
+                    path: 'title',
+                }
+            }
+        },
+        {
+            $sort: {
+                _id: 1,
+            }
+        },
+        {
+            $limit: 2,
+        }
+    ]
+    console.log(req.query.value);
+    db.collection('post').aggregate(searchCond).toArray((error, result) => {
+        console.log(result);
+        res.render('search.ejs', { posts : result })
+    });
+})
+
+
+app.use('/shop', require('./routes/shop.js'));
+
+app.use('/board/sub', require('./routes/board.js'));
+
+
+let multer = require('multer');
+let storage = multer.diskStorage({
+    destination: function(req, file, cb){
+        cb(null, './public/image')
+    },
+    filename: function(req, file, cb) {
+        cb(null, file.originalname)
+    }
+});
+
+let upload = multer({storage: storage});
+
+app.get('/upload', function(req, res) {
+    res.render('upload.ejs');
+});
+
+app.post('/upload', upload.single('profile'), function(req, res) {
+    res.send('uploaded');
+});
+
+app.get('/image/:imagename', function(req, res) {
+    res.sendFile(__dirname + '/public/image/' + req.params.imagename);
+});
