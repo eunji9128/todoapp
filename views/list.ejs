@@ -50,6 +50,7 @@
                 <a href="/edit/<%= posts[i]._id %>">
                     <button class="btn btn-primary edit" data-id="<%= posts[i]._id %>">edit</button>
                 </a>
+                <button class="btn btn-info chat" data-id="<%= posts[i]._id %>">chat</button>
             </li>    
         <% } %>
     </ul>
@@ -76,6 +77,11 @@
                 console.log(xhr, textStatus, errorThrown);
             });
 
+        })
+
+        $('.chat').click(function(e) {
+            var postId = e.target.dataset.id
+            window.location.replace('/chat?value=' + postId);
         })
     </script>
     

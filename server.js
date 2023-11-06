@@ -145,6 +145,11 @@ app.put('/edit', function(req, res) {
     )
 })
 
+app.get('/chat', function(req, res) {
+    let postId = req.query.value;
+    res.send(postId);
+})
+
 app.get('/mypage', isLogin, function(req, res) {
     res.render('myPage.ejs', {user: req.user});
 });
